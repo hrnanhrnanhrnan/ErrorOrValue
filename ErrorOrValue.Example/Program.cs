@@ -1,6 +1,5 @@
-﻿using ErrorOrValue;
-
-namespace ErrorsAsValues.Example;
+﻿
+namespace ErrorOrValue.Example;
 
 class Program
 {
@@ -12,7 +11,6 @@ class Program
             () => 
             {
                 using var disp = new DisposableClass();
-                throw new InvalidOperationException();
                 return disp.GetInt();
             },
             new Type[] { typeof(OperationCanceledException) }
@@ -20,11 +18,11 @@ class Program
 
         if (userCreationError is not null)
         {
-            System.Console.WriteLine(userCreationError.GetType());
-            System.Console.WriteLine(userCreationError.Message);
+            Console.WriteLine(userCreationError.GetType());
+            Console.WriteLine(userCreationError.Message);
         }
         
-        System.Console.WriteLine(number);
+        Console.WriteLine(number);
     }
 
 }
@@ -48,7 +46,7 @@ class User
 
     public static Task DoSomethingAsync()
     {
-        return Task.Run(() => System.Console.WriteLine("Hejsan"));
+        return Task.Run(() => Console.WriteLine("Hejsan"));
     }
 
     public static User CreateUser(string name)
