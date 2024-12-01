@@ -28,10 +28,22 @@ dotnet add package ErrorOrValue
 The **ErrorOr** class provides static methods to execute actions or functions and capture any exceptions as return values.
 
 #### Synchronous Functions
+
+For void functions with no return values, will return either a Exception or null:
 ```csharp
 using ErrorOrValue;
 
-var result = ErrorOr.Try(() => SomeFunction());
+var error = ErrorOr.Try(() => SomeVoidFunction());
+
+if (error is not null)
+{
+    // Use error
+}
+```
+
+For functions with return values, will return a **ErrorOr\<TResult\>** type:
+```csharp
+var result = ErrorOr.Try(() => GetUser());
 
 // Check if the operation was successful
 if (result.IsSuccess)
@@ -45,9 +57,23 @@ else
 ```
 
 #### Asynchronous Functions
-```csharp
-var result = await ErrorOr.TryAsync(async () => await SomeAsyncFunction());
 
+For async functions with no return values:
+
+```csharp
+var error = await ErrorOr.TryAsync(() => SomeAsyncFunction());
+
+if (error is not null)
+{
+    // Use error
+}
+```
+
+For async functions with return values:
+```csharp
+var result = await ErrorOr.TryAsync(() => GetUserAsync());
+
+// Check if the operation was successful
 if (result.IsSuccess)
 {
     // Use result.Value
@@ -60,9 +86,10 @@ else
 
 #### Result Deconstruction
 
-The **ErrorOr<TResult>** type also supports deconstruction 
+The **ErrorOr\<TResult\>** type also supports deconstruction:
+
 ```csharp
-var (error, user) = await ErrorOr.TryAsync(() => GetuserAsync());
+var (error, user) = await ErrorOr.TryAsync(() => GetUserAsync());
 
 if (error is not null)
 {
@@ -70,6 +97,6 @@ if (error is not null)
 }
 else
 {
-    Console.WriteLine(user.Name); // Robin
+    Console.WriteLine(user);
 }
 ```
