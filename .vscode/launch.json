@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/ErrorsAsValues.Example/bin/Debug/net6.0/ErrorsAsValues.Example.dll",
+            "program": "${workspaceFolder}/ErrorOrValue.Example/bin/Debug/net6.0/ErrorOrValue.Example.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",

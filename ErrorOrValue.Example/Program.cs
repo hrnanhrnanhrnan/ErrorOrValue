@@ -1,62 +1,60 @@
-﻿
-namespace ErrorOrValue.Example;
+﻿namespace ErrorOrValue.Example;
 
 class Program
 {
-    static void Main()
+    static async Task Main()
     {
-        var error = ErrorOr.Try(() => User.DoSomething());
+        // Supports a simple Try for actions which returns a nullable Exception, to  
+        var error = ErrorOr.Try(() => System.Console.WriteLine("hejsan"), ex => new InvalidDataException());
 
-        var (userCreationError, number) = ErrorOr.Try(
-            () => 
-            {
-                using var disp = new DisposableClass();
-                return disp.GetInt();
-            },
-            new Type[] { typeof(OperationCanceledException) }
+        if (error is not null)
+        {
+            Console.WriteLine(error.Message);
+        }
+
+        // 
+        var errorFromTask = await ErrorOr.TryAsync(() => UserCreator.FireAndForgetAsync(), ex => new InvalidDataException());
+
+        if (errorFromTask is not null)
+        {
+            Console.WriteLine(errorFromTask.Message);
+        }
+
+        // You can use the Result object directly, which has propertys as Error, Value, IsSuccess and IsFailure
+        var result = await ErrorOr.TryAsync(
+            () => UserCreator.CreateUserAsync(""), // will throw ArgumentException
+            (ex) => new InvalidCastException(ex.Message)
         );
 
-        if (userCreationError is not null)
+        if (result.IsFailure)
         {
-            Console.WriteLine(userCreationError.GetType());
-            Console.WriteLine(userCreationError.Message);
+            Console.WriteLine(result.Error); // System.InvalidCastException
+        }
+        else
+        {
+            Console.WriteLine(result.Value);
         }
         
-        Console.WriteLine(number);
-    }
+        // Or you can use deconstruction to get a tuple of possible exception or the value
+        var (userCreationError, user) = await ErrorOr.TryAsync(() => UserCreator.CreateUserAsync("Rob"));
+        
+        if (userCreationError is not null)
+        {
+            Console.WriteLine(userCreationError.Message);
+        }
 
-}
+        Console.WriteLine(user.Name); // Robin
 
-class DisposableClass : IDisposable
-{
-    public int GetInt() => 21;
-    public void Dispose()
-    {
-        Console.WriteLine("Disposing");
-    }
-}
+        // And you can also specify the exceptions you are expecting, 
+        // if the exception thrown is not among the expected exceptions, the exception will not be catched
+        var (argumentException, otherUser) = await ErrorOr.TryAsync(
+            () => UserCreator.CreateUserAsync(""),
+            typeof(ArgumentException), typeof(ArgumentNullException)
+        );
 
-class User
-{
-    public string? Name { get; set;}
-    public static void DoSomething()
-    {
-        Console.WriteLine("Hejsan");
-    }
-
-    public static Task DoSomethingAsync()
-    {
-        return Task.Run(() => Console.WriteLine("Hejsan"));
-    }
-
-    public static User CreateUser(string name)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        return new User { Name = name };
-    }
-    public static Task<User> CreateUserAsync(string name)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        return Task.FromResult(CreateUser(name));
+        if (argumentException is not null)
+        {
+            Console.WriteLine(argumentException); // System.ArgumentException
+        }
     }
 }

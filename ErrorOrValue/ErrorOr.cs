@@ -4,54 +4,53 @@ namespace ErrorOrValue;
 
 public static class ErrorOr
 {
-    public static ErrorOr<TResult, Exception> Try<TResult>(Func<TResult> func)
-    {
-        return TryWithWantedException<TResult, Exception>(func);
-    }
+    public static Exception? Try(Action action, params Type[]? expectedExceptions)
+        => TryExecute<Exception>(action, expectedExceptions: expectedExceptions);
+
+    public static TException? Try<TException>(
+        Action action,
+        Func<Exception, TException> catchHandler)
+            where TException : Exception
+        => TryExecute(action, catchHandler);
+
+    public static ErrorOr<TResult> Try<TResult>(
+        Func<TResult> func,
+        params Type[]? expectedExceptions)
+        => TryExecute(func, expectedExceptions);
 
     public static ErrorOr<TResult, TException> Try<TResult, TException>(
-        Func<TResult> func, 
-        Func<Exception, TException>? wantedException = default)
+        Func<TResult> func,
+        Func<Exception, TException> catchHandler)
         where TException : Exception
-    {
-        return TryWithWantedException(func, wantedException);
-    }
+        => TryExecute(func, catchHandler);
 
-    public static ErrorOr<TResult, Exception> Try<TResult>(
-        Func<TResult> func, 
-        params Type[] expectedExceptions)
-    {
-        return TryWithExpectedExceptions(func, expectedExceptions);
-    }
+    public static Task<Exception?> TryAsync(
+        Func<Task> func,
+        params Type[]? expectedExceptions)
+        => TryExecuteAsync<Exception>(func, expectedExceptions: expectedExceptions);
 
-    public static Task<ErrorOr<TResult, Exception>> TryAsync<TResult>(Func<Task<TResult>> func)
-    {
-        return TryWithWantedExceptionAsync<TResult, Exception>(func);
-    }
+    public static Task<TException?> TryAsync<TException>(
+        Func<Task> func,
+        Func<Exception, TException> catchHandler)
+            where TException : Exception
+        => TryExecuteAsync(func, catchHandler);
+
+    public static Task<ErrorOr<TResult>> TryAsync<TResult>(
+        Func<Task<TResult>> func,
+        params Type[]? expectedExceptions)
+        => TryExecuteAsync(func, expectedExceptions);
 
     public static Task<ErrorOr<TResult, TException>> TryAsync<TResult, TException>(
         Func<Task<TResult>> func,
-        Func<Exception, TException>? wantedException = default)
+        Func<Exception, TException> catchHandler)
         where TException : Exception
-    {
-        return TryWithWantedExceptionAsync(func, wantedException);
-    }
+        => TryExecuteAsync(func, catchHandler);
 
-    public static async Task<Exception?> TryAsync<TResult>(
-        Func<Task> func)
-    {
-        try
-        {
-            await func();
-            return default;
-        }
-        catch (Exception ex)
-        {
-            return ex;
-        }
-    }
-
-    public static Exception? Try(Action action)
+    private static TException? TryExecute<TException>(
+        Action action,
+        Func<Exception, TException>? catchHandler = null,
+        Type[]? expectedExceptions = null)
+            where TException : Exception
     {
         try
         {
@@ -60,14 +59,38 @@ public static class ErrorOr
         }
         catch (Exception ex)
         {
-            return ex;
+            if (IsExceptionExpected(expectedExceptions, ex))
+            {
+                return catchHandler?.Invoke(ex) ?? (TException)ex;
+            }
+
+            throw;
         }
     }
 
-    private static ErrorOr<TResult, TException> TryWithWantedException<TResult, TException>(
+    private static ErrorOr<TResult> TryExecute<TResult>(
         Func<TResult> func,
-        Func<Exception, TException>? wantedException = default
-    )   where TException : Exception
+        Type[]? expectedExceptions = null)
+    {
+        try
+        {
+            return new ErrorOr<TResult>(func());
+        }
+        catch (Exception ex)
+        {
+            if (IsExceptionExpected(expectedExceptions, ex))
+            {
+                return new ErrorOr<TResult>(ex);
+            }
+
+            throw;
+        }
+    }
+
+    private static ErrorOr<TResult, TException> TryExecute<TResult, TException>(
+        Func<TResult> func,
+        Func<Exception, TException> catchHandler)
+        where TException : Exception
     {
         try
         {
@@ -75,14 +98,33 @@ public static class ErrorOr
         }
         catch (Exception ex)
         {
-            return new ErrorOr<TResult, TException>(wantedException?.Invoke(ex) ?? (TException)ex);
+            return new ErrorOr<TResult, TException>(catchHandler(ex));
         }
     }
 
-    private static async Task<ErrorOr<TResult, TException>> TryWithWantedExceptionAsync<TResult, TException>(
+    private static async Task<ErrorOr<TResult>> TryExecuteAsync<TResult>(
         Func<Task<TResult>> func,
-        Func<Exception, TException>? wantedException = default
-    )   where TException : Exception
+        Type[]? expectedExceptions = null)
+    {
+        try
+        {
+            return new ErrorOr<TResult>(await func());
+        }
+        catch (Exception ex)
+        {
+            if (IsExceptionExpected(expectedExceptions, ex))
+            {
+                return new ErrorOr<TResult>(ex);
+            }
+
+            throw;
+        }
+    }
+
+    private static async Task<ErrorOr<TResult, TException>> TryExecuteAsync<TResult, TException>(
+        Func<Task<TResult>> func,
+        Func<Exception, TException> catchHandler)
+            where TException : Exception
     {
         try
         {
@@ -90,28 +132,32 @@ public static class ErrorOr
         }
         catch (Exception ex)
         {
-            return new ErrorOr<TResult, TException>(wantedException?.Invoke(ex) ?? (TException)ex);
+            return new ErrorOr<TResult, TException>(catchHandler(ex));
         }
     }
 
-    private static ErrorOr<TResult, Exception> TryWithExpectedExceptions<TResult>(
-        Func<TResult> func,
-        params Type[] expectedExceptions)
+    private static async Task<TException?> TryExecuteAsync<TException>(
+        Func<Task> func,
+        Func<Exception, TException>? catchHandler = default,
+        Type[]? expectedExceptions = null)
+        where TException : Exception
     {
         try
         {
-            return new ErrorOr<TResult, Exception>(func());
+            await func();
+            return null;
         }
         catch (Exception ex)
         {
-            var exceptionType = ex.GetType();
-
-            if (!expectedExceptions.Contains(exceptionType))
+            if (IsExceptionExpected(expectedExceptions, ex))
             {
-                throw;
+                return catchHandler?.Invoke(ex) ?? (TException)ex;
             }
 
-            return new ErrorOr<TResult, Exception>(ex);
+            throw;
         }
     }
+
+    private static bool IsExceptionExpected(Type[]? expectedTypes, Exception exception)
+        => expectedTypes is not { Length: > 0 }  || expectedTypes.Contains(exception.GetType());
 }

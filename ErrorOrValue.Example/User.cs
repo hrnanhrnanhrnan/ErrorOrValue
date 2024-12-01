@@ -1,0 +1,1 @@
+record User(string Name);
