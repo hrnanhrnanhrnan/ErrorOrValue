@@ -1,0 +1,112 @@
+name: Tag Check, Test, Build, Pack, and Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  check-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on a release branch
+        id: verify_tag
+        shell: bash
+        continue-on-error: true
+        run: |
+          TAG_COMMIT_SHA=$(git rev-parse $GITHUB_REF)
+          echo "Tag commit SHA: $TAG_COMMIT_SHA"
+
+          BRANCHES=$(git branch -r --contains $TAG_COMMIT_SHA)
+          echo "Branches containing the commit of the tag:"
+          echo "$BRANCHES"
+
+          if echo "$BRANCHES" | grep -qE 'origin/release/v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "The tag is on a release branch."
+            echo "tag_valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "The tag is not on a release branch."
+            echo "tag_valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Delete Tag
+        if: ${{ steps.verify_tag.outputs.tag_valid == 'false' }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          script: |
+            const tagRef = context.ref; // refs/tags/v1.0.2
+            const tagName = tagRef.replace('refs/tags/', '');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            try {
+              await github.rest.git.deleteRef({
+                owner,
+                repo,
+                ref: `tags/${tagName}`,
+              });
+              core.notice(`Tag '${tagName}' has been deleted.`);
+            } catch (error) {
+              core.setFailed(`Failed to delete tag '${tagName}': ${error.message}`);
+            }
+
+      - name: Fail Job if Tag is Invalid
+        if: ${{ steps.verify_tag.outputs.tag_valid == 'false' }}
+        run: |
+          echo "Failing job because tag is invalid."
+          exit 1
+
+  build-and-release:
+    needs: check-tag
+    runs-on: ubuntu-latest
+    if: ${{ needs.check-tag.result == 'success' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore 
+
+      - name: Run Tests
+        run: dotnet test --no-build --configuration Release
+
+      - name: Pack NuGet Package
+        run: dotnet pack FluentBindingValidation/FluentBindingValidation.csproj --configuration Release --output ./nupkgs -p:Version=${{ env.VERSION }}
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./nupkgs/*.nupkg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to NuGet.org
+        run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json

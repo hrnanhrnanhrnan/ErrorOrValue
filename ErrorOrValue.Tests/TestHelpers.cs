@@ -1,4 +1,5 @@
 namespace ErrorOrValue.Tests;
+
 internal static class TestHelpers
 {
     public static int GetNumberOneOrThrow(

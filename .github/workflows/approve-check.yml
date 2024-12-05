@@ -1,0 +1,90 @@
+name: Check Approver
+
+on:
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+      - dismissed
+  pull_request:
+    types:
+      - reopened
+      - ready_for_review
+      - closed
+
+jobs:
+  check-approver:
+    name: check-approver
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Check approver
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const targetBranch = context.payload.pull_request.base.ref;
+
+            let codeownersContent;
+            try {
+              codeownersContent = fs.readFileSync('.github/CODEOWNERS', 'utf8');
+            } catch (error) {
+              core.setFailed('Could not read CODEOWNERS file.');
+              return;
+            }
+
+            const codeownersLines = codeownersContent.split('\n').filter(line => line.trim() !== '');
+            let requiredApprovers = [];
+
+            for (const line of codeownersLines) {
+              if (line.startsWith('#')) {
+                continue;
+              }
+
+              const [pattern, ...owners] = line.trim().split(/\s+/);
+
+              // Handle branch patterns
+              if (pattern.startsWith('branch:')) {
+                const branchPattern = pattern.replace('branch:', '');
+                const regexPattern = '^' + branchPattern.replace('*', '.*') + '$';
+                const branchRegex = new RegExp(regexPattern);
+
+                if (branchRegex.test(targetBranch)) {
+                  requiredApprovers.push(...owners.map(owner => owner.replace('@', '')));
+                }
+              }
+            }
+
+            // Remove duplicates
+            requiredApprovers = [...new Set(requiredApprovers)];
+
+            if (requiredApprovers.length === 0) {
+              core.setFailed(`No approvers defined for the branch '${targetBranch}' in CODEOWNERS.`);
+              return;
+            }
+
+            // Fetch approvers for the PR
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+
+            const approvedBy = reviews
+              .filter(review => review.state === 'APPROVED')
+              .map(review => review.user.login);
+
+            // Check if any of approvers for PR is among required approvers
+            const hasRequiredApproval = requiredApprovers.some(user => approvedBy.includes(user));
+
+            if (hasRequiredApproval) {
+              core.notice(`Pull request approved by authorized approver.`);
+            } else {
+              core.setFailed(`Pull request has to be approved by any of the required users: ${requiredApprovers.join(', ')}.`);
+            }
