@@ -82,6 +82,12 @@ else
 
 // Or with deconstruction
 var (error, user) = ErrorOr.Try(() => GetUser()); 
+
+if (error is not null)
+{
+  // Handle the exception 
+}
+
 ```
 
 ### Transforming Exceptions with a Catch Handler 
