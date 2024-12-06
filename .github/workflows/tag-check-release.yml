@@ -92,13 +92,13 @@ jobs:
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore 
+        run: dotnet build -c Release --no-restore 
 
       - name: Run Tests
-        run: dotnet test --no-build --configuration Release
+        run: dotnet test --no-build -c Release
 
       - name: Pack NuGet Package
-        run: dotnet pack FluentBindingValidation/FluentBindingValidation.csproj --configuration Release --output ./nupkgs -p:Version=${{ env.VERSION }}
+        run: dotnet pack ErrorOrValue/ErrorOrValue.csproj -c Release --output ./nupkgs -p:Version=${{ env.VERSION }}
 
       - name: Create GitHub Release
         id: create_release

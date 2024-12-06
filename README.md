@@ -84,7 +84,7 @@ else
 }
 
 // Or with deconstruction
-var (error, user) = ErrorOr.Try(() => GetUser());
+var (error, user) = ErrorOr.Try(GetUser);
 
 if (error is not null)
 {
@@ -149,7 +149,7 @@ ErrorOr<int> asyncResult = await ErrorOr.TryAsync(async () =>
 
 // Or with deconstruction
 var (customError, customer) = await ErrorOr.TryAsync(
-  () => GetCustomerAsync(),
+  GetCustomerAsync,
   ex => new CustomException("Custom message", ex)
 );
 ```
