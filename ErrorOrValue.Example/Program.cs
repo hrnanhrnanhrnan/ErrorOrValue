@@ -4,20 +4,20 @@ class Program
 {
     static async Task Main()
     {
-        // Supports a simple Try for actions which returns a nullable Exception, to  
-        var error = ErrorOr.Try(() => System.Console.WriteLine("hejsan"), ex => new InvalidDataException());
+        // Supports a simple Try for actions which returns a nullable Exception  
+        var error = ErrorOr.Try(UserCreator.FireAndForget, ex => new InvalidDataException());
 
         if (error is not null)
         {
-            Console.WriteLine(error.Message);
+            Console.WriteLine(error.Message); // Found invalid data while decoding.
         }
 
-        // 
-        var errorFromTask = await ErrorOr.TryAsync(() => UserCreator.FireAndForgetAsync(), ex => new InvalidDataException());
+        // Supports async operations aswell
+        var errorFromTask = await ErrorOr.TryAsync(UserCreator.FireAndForgetAsync, ex => new InvalidDataException());
 
         if (errorFromTask is not null)
         {
-            Console.WriteLine(errorFromTask.Message);
+            Console.WriteLine(errorFromTask.Message); // Found invalid data while decoding.
         }
 
         // You can use the Result object directly, which has propertys as Error, Value, IsSuccess and IsFailure
@@ -43,7 +43,7 @@ class Program
             Console.WriteLine(userCreationError.Message);
         }
 
-        Console.WriteLine(user.Name); // Robin
+        Console.WriteLine(user?.Name); // Rob
 
         // And you can also specify the exceptions you are expecting, 
         // if the exception thrown is not among the expected exceptions, the exception will not be catched

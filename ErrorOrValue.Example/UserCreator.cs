@@ -1,3 +1,5 @@
+namespace ErrorOrValue.Example;
+
 class UserCreator
 {
     public static void FireAndForget()
